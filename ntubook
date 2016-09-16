@@ -1,0 +1,191 @@
+#!/usr/bin/python3
+
+import sys
+import re
+import subprocess
+import yaml
+import datetime
+from urllib import parse
+
+
+def print_help(program):
+    print('usage:')
+    print('    {} <config.yaml>'.format(program))
+
+
+def get_conf(filename):
+    with open(filename) as f:
+        conf = yaml.load(f)
+    return conf
+
+
+def get_command_result(command):
+    with subprocess.Popen(command, stdout=subprocess.PIPE, universal_newlines=True) as p:
+        line = p.stdout.read()
+    return line
+
+
+def get_cookie_value(line, key):
+    match = re.search(r'{}=([^;]+)'.format(key), line)
+    if not match:
+        raise Exception('get {} failed.'.format(key))
+    return match.group(1)
+
+
+def get_citrix_ns_id():
+    line = get_command_result(['./curl/start.sh'])
+    return get_cookie_value(line, 'citrix_ns_id')
+
+
+def get_session_id(identity, citrix_ns_id):
+    line = get_command_result([
+        './curl/login.sh',
+        citrix_ns_id,
+        identity['username'],
+        identity['password'],
+    ])
+    return get_cookie_value(line, r'ASP\.NET_SessionId')
+
+
+def mystery_a(digit):
+    return {
+        0: 'MA',
+        1: 'MQ',
+        2: 'Mg',
+        3: 'Mw',
+        4: 'NA',
+        5: 'NQ',
+        6: 'Ng',
+        7: 'Nw',
+        8: 'OA',
+        9: 'OQ',
+    }[digit]
+
+def mystery_b(digit):
+    return {
+        0: 'DA',
+        1: 'DE',
+        2: 'DI',
+        3: 'DM',
+    }[digit]
+
+
+def mystery_c(digit):
+    return {
+        0: 'wA',
+        1: 'xA',
+        2: 'yA',
+        3: 'zA',
+        4: '0A',
+        5: '1A',
+        6: '2A',
+        7: '3A',
+        8: '4A',
+        9: '5A',
+    }[digit]
+
+
+def get_digit(number, which):
+    number = list(reversed(str(number)))
+    which = list(reversed(str(which)))
+
+    if any([bit not in ('0', '1') for bit in which]):
+        raise Exception('which must be consisted of 1 and 0')
+
+    if len(number) < len(which):
+        return 0
+
+    for idx, bit in enumerate(which):
+        if bit == '1':
+            return int(number[idx])
+
+
+def generate_mystery_number(number):
+    if 0 <= number < 10:
+        return '{}A1'.format(mystery_a(number))
+    if 10 <= number < 99:
+        ten = get_digit(number, 10)
+        one = get_digit(number, 1)
+        return '{}A{}A2'.format(mystery_a(ten), mystery_c(one))
+    raise Exception('unsupported number: {}'.format(number))
+
+
+def generate_date_lst(date):
+    return parse.quote_plus('{}/{}/{}'.format(date['year'], date['month'], date['day']))
+
+
+def generate_mystery_time(hour):
+    return generate_mystery_number(hour)
+
+
+def generate_section(from_hour):
+    return generate_mystery_number(from_hour - 7)
+
+
+def generate_mystery_date(date):
+    thousand = get_digit(date['year'], 1000)
+    hundred = get_digit(date['year'], 100)
+    ten = get_digit(date['year'], 10)
+    one = get_digit(date['year'], 1)
+    year = '{}A{}{}A{}A'.format(mystery_a(thousand), mystery_c(hundred), mystery_b(ten), mystery_a(one))
+
+    ten = get_digit(date['month'], 10)
+    one = get_digit(date['month'], 1)
+    month = 'A{}A{}A'.format(mystery_b(ten), mystery_a(one))
+
+    ten = get_digit(date['day'], 10)
+    one = get_digit(date['day'], 1)
+    day = 'A{}A{}A'.format(mystery_b(ten), mystery_a(one))
+
+    return '{}v{}v{}1'.format(year, month, day)
+
+
+def generate_mystery_week(date):
+    week_day = datetime.date(date['year'], date['month'], date['day']).weekday()
+    week_day += 1
+    return generate_mystery_number(week_day)
+
+
+def book_room(date, hour, username, receipt_num, citrix_ns_id, session_id):
+    date_lst = generate_date_lst(date)
+    start_time_code = generate_mystery_time(hour['from'])
+    end_time_code = generate_mystery_time(hour['from'] + hour['duration'])
+    start_time_num = str(hour['from'])
+    end_time_num = str(hour['from'] + hour['duration'])
+    section = generate_section(hour['from'])
+    date_code = generate_mystery_date(date)
+    week_code = generate_mystery_week(date)
+
+    line = get_command_result([
+        './curl/book.sh',
+        citrix_ns_id,
+        session_id,
+        username,
+        date_lst,
+        start_time_code,
+        end_time_code,
+        start_time_num,
+        end_time_num,
+        section,
+        date_code,
+        week_code,
+        receipt_num,
+    ])
+
+    print(line)
+
+
+def main(argv):
+    if len(argv) != 2:
+        print_help(argv[0])
+        return
+
+    conf = get_conf(argv[1])
+
+    citrix_ns_id = get_citrix_ns_id()
+    session_id = get_session_id(conf['identity'], citrix_ns_id)
+    book_room(conf['date'], conf['hour'], conf['identity']['username'], conf['payment']['receipt'], citrix_ns_id, session_id)
+
+
+if __name__ == '__main__':
+    main(sys.argv)
