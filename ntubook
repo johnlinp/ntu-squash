@@ -146,6 +146,10 @@ def generate_mystery_week(date):
     return generate_mystery_number(week_day)
 
 
+def generate_pay_price(duration):
+    return str(250 * duration)
+
+
 def book_room(date, hour, username, receipt_num, citrix_ns_id, session_id):
     date_lst = generate_date_lst(date)
     start_time_code = generate_mystery_time(hour['from'])
@@ -155,6 +159,7 @@ def book_room(date, hour, username, receipt_num, citrix_ns_id, session_id):
     section = generate_section(hour['from'])
     date_code = generate_mystery_date(date)
     week_code = generate_mystery_week(date)
+    pay_price = generate_pay_price(hour['duration'])
 
     line = get_command_result([
         './curl/book.sh',
@@ -170,6 +175,7 @@ def book_room(date, hour, username, receipt_num, citrix_ns_id, session_id):
         date_code,
         week_code,
         receipt_num,
+        pay_price,
     ])
 
     print(line)
