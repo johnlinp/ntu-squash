@@ -8,3 +8,5 @@ hour:
 identity:
     username: A123456789
     password: secret
+payment:
+    receipt: AB87654321
