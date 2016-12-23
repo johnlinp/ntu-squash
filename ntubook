@@ -5,6 +5,7 @@ import re
 import subprocess
 import yaml
 import datetime
+import requests
 from urllib import parse
 
 
@@ -19,32 +20,55 @@ def get_conf(filename):
     return conf
 
 
-def get_command_result(command):
-    with subprocess.Popen(command, stdout=subprocess.PIPE, universal_newlines=True) as p:
-        line = p.stdout.read()
-    return line
-
-
-def get_cookie_value(line, key):
-    match = re.search(r'{}=([^;]+)'.format(key), line)
-    if not match:
-        raise Exception('get {} failed.'.format(key))
-    return match.group(1)
-
-
 def get_citrix_ns_id():
-    line = get_command_result(['./curl/start.sh'])
-    return get_cookie_value(line, 'citrix_ns_id')
+    headers = {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Connection': 'keep-alive',
+        'Accept-Encoding': 'gzip, deflate, sdch',
+        'Accept-Language': 'en-US,en;q=0.8,zh-TW;q=0.6,zh;q=0.4,zh-CN;q=0.2',
+        'Upgrade-Insecure-Requests': '1',
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.108 Safari/537.36',
+    }
+
+    response = requests.get('https://info2.ntu.edu.tw/facilities/Default.aspx', headers=headers)
+
+    return response.cookies['citrix_ns_id']
 
 
 def get_session_id(identity, citrix_ns_id):
-    line = get_command_result([
-        './curl/login.sh',
-        citrix_ns_id,
-        identity['username'],
-        identity['password'],
-    ])
-    return get_cookie_value(line, r'ASP\.NET_SessionId')
+    cookies = {
+        'citrix_ns_id': citrix_ns_id,
+    }
+
+    headers = {
+        'Origin': 'https://info2.ntu.edu.tw',
+        'Accept-Encoding': 'gzip, deflate',
+        'Accept-Language': 'en-US,en;q=0.8,zh-TW;q=0.6,zh;q=0.4,zh-CN;q=0.2',
+        'Upgrade-Insecure-Requests': '1',
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.108 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Cache-Control': 'max-age=0',
+        'Referer': 'https://info2.ntu.edu.tw/facilities/Default.aspx',
+        'Connection': 'keep-alive',
+    }
+
+    data = {
+      'ctl00_ContentPlaceHolder1_tcTab_ClientState': '{"ActiveTabIndex":2,"TabState":[true,true,true]}',
+      '__EVENTTARGET': '',
+      '__EVENTARGUMENT': '',
+      '__VIEWSTATE': '/wEPDwUKMTkxMDM2MTQyNQ9kFgJmD2QWAgIDD2QWCAIDDw8WAh4EVGV4dAUZ5LuK5pel5pel5pyf77yaMjAxNi8wOS8xNmRkAgUPDxYCHwAFSeS9v+eUqOiAhTroqKrlrqIoR3Vlc3Qp5oKo5aW9PEJSPjxCUj7mraHov47kvb/nlKjnt5rkuIrloLTlnLDpoJDntITns7vntbFkZAIHDw8WAh4HVmlzaWJsZWhkZAILDxYCHwAFvQM8bWFycXVlZSBzY3JvbGxhbW91bnQ9JzInIHNjcm9sbGRlbGF5PScxMzAnIGRpcmVjdGlvbj0gJ3VwJyBpZD14aWFvcWluZyBvbm1vdXNlb3Zlcj14aWFvcWluZy5zdG9wKCkgb25tb3VzZW91dD14aWFvcWluZy5zdGFydCgpPjxwPu+8ijIwMTblubQ55pyI5Lu95pmo6ZaT55CD5aC0KDA2OjEwfjA3OjUwKeWgtOWcsOioiuaBr+WFrDxhIGhyZWY9amF2YXNjcmlwdDp2b2lkKHdpbmRvdy5vcGVuKCdOZXdzRm9ybS5hc3B4P25ld3NJZD0xOTcnLCfmnIDmlrDmtojmga8nLCdtZW51YmFyPW5vLHN0YXR1cz1ubyxkaXJlY3Rvcmllcz1ubyxtZW51YmFyPW5vLHJlc2l6YWJsZT1ubyx0b29sYmFyPW5vLHNjcm9sbGJhcnM9eWVzLHRvcD0yMDAsbGVmdD0yMDAsd2lkdGg9NTUwLGhlaWdodD0zMDAnKSk+Li4uTW9yZTwvYT4gIOOAkDIwMTYvOC8zMeabtOaWsOOAkTwvcD48cD48L21hcnF1ZWU+ZBgCBR5fX0NvbnRyb2xzUmVxdWlyZVBvc3RCYWNrS2V5X18WAgUfY3RsMDAkQ29udGVudFBsYWNlSG9sZGVyMSR0Y1RhYgUyY3RsMDAkQ29udGVudFBsYWNlSG9sZGVyMSR0Y1RhYiRUYWJQYW5lbDMkYnRuTG9naW4FH2N0bDAwJENvbnRlbnRQbGFjZUhvbGRlcjEkdGNUYWIPD2RmZJSTnQDs/h5xtlrJJeR+HLdkRD3u',
+      '__VIEWSTATEGENERATOR': 'FDD57D8C',
+      '__EVENTVALIDATION': '/wEWBAL/2O+7CQK10MWvBgLD9Iu6CwKbm52ABMnKYUa1M0LCIA9ucGEISJUHy1A7',
+      'ctl00$ContentPlaceHolder1$tcTab$TabPanel3$txtMemberID': identity['username'],
+      'ctl00$ContentPlaceHolder1$tcTab$TabPanel3$txtPassword': identity['password'],
+      'ctl00$ContentPlaceHolder1$tcTab$TabPanel3$btnLogin.x': '19',
+      'ctl00$ContentPlaceHolder1$tcTab$TabPanel3$btnLogin.y': '2'
+    }
+
+    response = requests.post('https://info2.ntu.edu.tw/facilities/Default.aspx', headers=headers, cookies=cookies, data=data, allow_redirects=False)
+
+    return response.cookies['ASP.NET_SessionId']
 
 
 def mystery_a(digit):
@@ -111,7 +135,7 @@ def generate_mystery_number(number):
 
 
 def generate_date_lst(date):
-    return parse.quote_plus('{}/{}/{}'.format(date['year'], date['month'], date['day']))
+    return '{}/{}/{}'.format(date['year'], date['month'], date['day'])
 
 
 def generate_mystery_time(hour):
@@ -161,24 +185,69 @@ def book_room(date, hour, username, receipt_num, citrix_ns_id, session_id):
     week_code = generate_mystery_week(date)
     pay_price = generate_pay_price(hour['duration'])
 
-    line = get_command_result([
-        './curl/book.sh',
-        citrix_ns_id,
-        session_id,
-        username,
-        date_lst,
-        start_time_code,
-        end_time_code,
-        start_time_num,
-        end_time_num,
-        section,
-        date_code,
-        week_code,
-        receipt_num,
-        pay_price,
-    ])
+    params = parse.urlencode({
+        'buildingSeq': 'MAA1',
+        'placeSeq': 'NAA1',
+        'dateLst': date_lst,
+        'sTime': start_time_code,
+        'eTime': end_time_code,
+        'section': section,
+        'date': date_code,
+        'week': week_code,
+    }, quote_via=parse.quote, safe='/')
+    url = 'https://info2.ntu.edu.tw/facilities/PlaceOrderFrm.aspx?{}'.format(params)
 
-    print(line)
+    cookies = {
+        'citrix_ns_id': citrix_ns_id,
+        'ASP.NET_SessionId': session_id,
+    }
+
+    headers = {
+        'Origin': 'https://info2.ntu.edu.tw',
+        'Accept-Encoding': 'gzip, deflate',
+        'Accept-Language': 'en-US,en;q=0.8,zh-TW;q=0.6,zh;q=0.4,zh-CN;q=0.2',
+        'Upgrade-Insecure-Requests': '1',
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.108 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Cache-Control': 'max-age=0',
+        'Referer': url,
+        'Connection': 'keep-alive',
+    }
+
+    data = {
+      '__EVENTTARGET': '',
+      '__EVENTARGUMENT': '',
+      '__LASTFOCUS': '',
+      '__VIEWSTATE': '/wEPDwUKMTMxOTU0ODM0MQ9kFgJmD2QWAgIDD2QWCAIDDw8WAh4EVGV4dAUZ5LuK5pel5pel5pyf77yaMjAxNi8wOS8xNmRkAgUPDxYCHwAFcOS9v+eUqOiAhe+8muael+iHquWdhyhBMTI3ODU0NjM4KTxCUj7ouqvku73liKXvvJrmoKHlj4s8QlI+5bey55m75YWlPEJSPjxCUj7mraHov47kvb/nlKjnt5rkuIrloLTlnLDpoJDntITns7vntbFkZAILDxYCHwAFvQM8bWFycXVlZSBzY3JvbGxhbW91bnQ9JzInIHNjcm9sbGRlbGF5PScxMzAnIGRpcmVjdGlvbj0gJ3VwJyBpZD14aWFvcWluZyBvbm1vdXNlb3Zlcj14aWFvcWluZy5zdG9wKCkgb25tb3VzZW91dD14aWFvcWluZy5zdGFydCgpPjxwPu+8ijIwMTblubQ55pyI5Lu95pmo6ZaT55CD5aC0KDA2OjEwfjA3OjUwKeWgtOWcsOioiuaBr+WFrDxhIGhyZWY9amF2YXNjcmlwdDp2b2lkKHdpbmRvdy5vcGVuKCdOZXdzRm9ybS5hc3B4P25ld3NJZD0xOTcnLCfmnIDmlrDmtojmga8nLCdtZW51YmFyPW5vLHN0YXR1cz1ubyxkaXJlY3Rvcmllcz1ubyxtZW51YmFyPW5vLHJlc2l6YWJsZT1ubyx0b29sYmFyPW5vLHNjcm9sbGJhcnM9eWVzLHRvcD0yMDAsbGVmdD0yMDAsd2lkdGg9NTUwLGhlaWdodD0zMDAnKSk+Li4uTW9yZTwvYT4gIOOAkDIwMTYvOC8zMeabtOaWsOOAkTwvcD48cD48L21hcnF1ZWU+ZAIND2QWAgIBD2QWEgIIDw8WAh8ABQY5MDA1NzNkZAIKDw8WAh8ABTPntpzlkIjpq5TogrLppKjlnLDkuIvkuIDmqJMtQjHlo4HnkIPlrqQgICAgICAgICAgICBkZAIMDw8WAh8ABQnmnpfoh6rlnYdkZAIaDw8WAh8ABQbmoKHlj4tkZAIcDxBkDxYCZgIBFgIQBQbnj77ph5EFBuePvumHkWcQBQnmmYLmlbjliLgFBuaZguaVuGdkZAIgDw8WAh8ABQoyMDE2LzA5LzIzZGQCIg8QZA8WD2YCAQICAgMCBAIFAgYCBwIIAgkCCgILAgwCDQIOFg8QBQQ4OjAwBQE4ZxAFBDk6MDAFATlnEAUFMTA6MDAFAjEwZxAFBTExOjAwBQIxMWcQBQUxMjowMAUCMTJnEAUFMTM6MDAFAjEzZxAFBTE0OjAwBQIxNGcQBQUxNTowMAUCMTVnEAUFMTY6MDAFAjE2ZxAFBTE3OjAwBQIxN2cQBQUxODowMAUCMThnEAUFMTk6MDAFAjE5ZxAFBTIwOjAwBQIyMGcQBQUyMTowMAUCMjFnEAUFMjI6MDAFAjIyZ2RkAiQPEGQPFg5mAgECAgIDAgQCBQIGAgcCCAIJAgoCCwIMAg0WDhAFBDk6MDAFATlnEAUFMTA6MDAFAjEwZxAFBTExOjAwBQIxMWcQBQUxMjowMAUCMTJnEAUFMTM6MDAFAjEzZxAFBTE0OjAwBQIxNGcQBQUxNTowMAUCMTVnEAUFMTY6MDAFAjE2ZxAFBTE3OjAwBQIxN2cQBQUxODowMAUCMThnEAUFMTk6MDAFAjE5ZxAFBTIwOjAwBQIyMGcQBQUyMTowMAUCMjFnEAUFMjI6MDAFAjIyZ2RkAioPDxYCHwAFLCROVDI1MC/loLTmrKEo5bCW5bOw5pmC5q61MTk6MDDoh7MyMDowMCk8QlI+ZGRkNG2B7MG7LP6t2kx5seFqax2I8XM=',
+      '__VIEWSTATEGENERATOR': '2C8BDEE8',
+      '__EVENTVALIDATION': '/wEWNQKt57EhAp6dhroKAqaCtLoHApWZoq4NAt71xboPAtSenfEBAoSEs7wEAoi/35AJAqWMq+QBAqnFmYANArGqs+4BAr6qs+4BAqaq8+0BAqaq/+0BAqaq++0BAqaqx+0BAqaqw+0BAqaqz+0BAqaqy+0BAqaq1+0BAqaqk+4BAqaqn+4BAqeq8+0BAqeq/+0BAqeq++0BArbX+rEDAqG40N8PArm4kNwPArm4nNwPArm4mNwPArm4pNwPArm4oNwPArm4rNwPArm4qNwPArm4tNwPArm48N8PArm4/N8PAri4kNwPAri4nNwPAri4mNwPApK4muULApPn4rUIAobWoPQJAuPlzq4KAoSM3rwPAobu5ewHAsr+h4wOAqfq9sYGArDuxJMHAvnS1vQJAvnS/oIKAuqoq44JApyNgdcNILG+6gAbQFz6g5M9LT2no2Em7Lw=',
+      'ctl00$ContentPlaceHolder1$txtContactName': '',
+      'ctl00$ContentPlaceHolder1$txtContactTel': '',
+      'ctl00$ContentPlaceHolder1$txtFax': '',
+      'ctl00$ContentPlaceHolder1$txtEmail': '',
+      'ctl00$ContentPlaceHolder1$DropLstPayMethod': '現金',
+      'ctl00$ContentPlaceHolder1$txtpayHourNum': receipt_num,
+      'ctl00$ContentPlaceHolder1$DropLstTimeStart': start_time_num,
+      'ctl00$ContentPlaceHolder1$DropLstTimeEnd': end_time_num,
+      'ctl00$ContentPlaceHolder1$txtPlaceNum': '1',
+      'ctl00$ContentPlaceHolder1$btnOrder': '送出預約',
+      'ctl00$ContentPlaceHolder1$hidbookDate': parse.quote_plus(date_lst),
+      'ctl00$ContentPlaceHolder1$hidmemberId': username,
+      'ctl00$ContentPlaceHolder1$hidplaceSeq': '4',
+      'ctl00$ContentPlaceHolder1$hidpayPrice': pay_price,
+      'ctl00$ContentPlaceHolder1$hidpeekCharge': '250',
+      'ctl00$ContentPlaceHolder1$hidoffCharge': '0',
+      'ctl00$ContentPlaceHolder1$hidsTime': start_time_num,
+      'ctl00$ContentPlaceHolder1$hideTime': end_time_num,
+      'ctl00$ContentPlaceHolder1$hidWeek': '5',
+      'ctl00$ContentPlaceHolder1$hiddateLst': parse.quote_plus(date_lst),
+    }
+
+    response = requests.post(url, headers=headers, cookies=cookies, data=data)
+
+    if '恭喜您' in response.text:
+        print('success')
 
 
 def main(argv):
