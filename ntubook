@@ -5,6 +5,7 @@ import re
 import subprocess
 import yaml
 import datetime
+import json
 import requests
 from urllib import parse
 
@@ -174,7 +175,19 @@ def generate_pay_price(duration):
     return str(250 * duration)
 
 
-def book_room(date, hour, username, receipt_num, citrix_ns_id, session_id):
+def set_myjson(myjson_id, json_object):
+    url = 'https://api.myjson.com/bins/{}'.format(myjson_id)
+
+    headers = {
+        'Content-Type': 'application/json',
+    }
+
+    data = json.dumps(json_object)
+
+    requests.put(url, headers=headers, data=data)
+
+
+def book_room(date, hour, username, receipt_num, myjson_id, citrix_ns_id, session_id):
     date_lst = generate_date_lst(date)
     start_time_code = generate_mystery_time(hour['from'])
     end_time_code = generate_mystery_time(hour['from'] + hour['duration'])
@@ -246,9 +259,11 @@ def book_room(date, hour, username, receipt_num, citrix_ns_id, session_id):
 
     response = requests.post(url, headers=headers, cookies=cookies, data=data)
 
-    if '恭喜您' in response.text:
-        print('success')
+    date_str = '{year}/{month}/{day}'.format(**date)
+    success = '恭喜您' in response.text
 
+    print('{} success: {}'.format(date_str, success))
+    set_myjson(myjson_id, {date_str: success})
 
 def main(argv):
     if len(argv) != 2:
@@ -259,7 +274,7 @@ def main(argv):
 
     citrix_ns_id = get_citrix_ns_id()
     session_id = get_session_id(conf['identity'], citrix_ns_id)
-    book_room(conf['date'], conf['hour'], conf['identity']['username'], conf['payment']['receipt'], citrix_ns_id, session_id)
+    book_room(conf['date'], conf['hour'], conf['identity']['username'], conf['payment']['receipt'], conf['store']['myjson'], citrix_ns_id, session_id)
 
 
 if __name__ == '__main__':

@@ -10,3 +10,5 @@ identity:
     password: secret
 payment:
     receipt: AB87654321
+store:
+    myjson: abcde
